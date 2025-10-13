@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Análise Fiscal</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --background: #10141f; --sidebar-bg: #191f2c; --card-bg: #1e2537;
+            --primary: #00aaff; --primary-hover: #33bbff; --text-primary: #e6e6e6;
+            --text-secondary: #a0a7b5; --border-color: #31394a; --shadow: 0 4px 15px rgba(0,0,0,0.2);
+            --sidebar-width-expanded: 320px;
+            --sidebar-width-collapsed: 60px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'IBM Plex Sans', sans-serif; background-color: var(--background); color: var(--text-primary); overflow: hidden; }
+        
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: var(--sidebar-width-collapsed) 1fr; /* Estado padrão é recolhido */
+            height: 100vh;
+            transition: grid-template-columns 0.4s ease-in-out;
+        }
+        .dashboard-container.sidebar-visible {
+            grid-template-columns: var(--sidebar-width-expanded) 1fr; /* Estado visível */
+        }
+
+        .sidebar { background-color: var(--sidebar-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .sidebar-header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; white-space: nowrap; }
+        .sidebar-header h1 { font-size: 1.5rem; font-weight: 600; color: var(--text-primary); }
+        .sidebar-header p { font-size: 0.9rem; color: var(--text-secondary); }
+        .sidebar-content { padding: 0 1.5rem; display: flex; flex-direction: column; gap: 2rem; overflow-y: auto; flex-grow: 1; white-space: nowrap; opacity: 1; transition: opacity 0.2s ease; }
+        
+        .dashboard-container:not(.sidebar-visible) .sidebar-header div,
+        .dashboard-container:not(.sidebar-visible) .sidebar-content,
+        .dashboard-container:not(.sidebar-visible) .user-details { opacity: 0; pointer-events: none; }
+        
+        #menu-toggle, #sidebar-close-btn { background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; padding: 0; margin: 0; }
+        #menu-toggle { text-align: center; width: 100%;}
+        .dashboard-container.sidebar-visible #menu-toggle { display: none; }
+        .dashboard-container:not(.sidebar-visible) #sidebar-close-btn { display: none; }
+
+        .control-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; }
+        .control-card h2 { font-size: 1rem; font-weight: 500; margin-bottom: 1rem; }
+        input[type="file"] { display: none; }
+        .file-label { background-color: transparent; color: var(--primary); padding: 10px 15px; border-radius: 5px; border: 1px dashed var(--primary); cursor: pointer; display: block; text-align: center; font-size: 0.9rem; transition: all 0.3s; }
+        .file-label:hover { background-color: rgba(0, 170, 255, 0.1); box-shadow: 0 0 10px rgba(0, 170, 255, 0.3); }
+        .file-name { display: block; margin-top: 10px; color: var(--text-secondary); font-size: 0.8rem; text-align: center; min-height: 1.2em; word-wrap: break-word; }
+        .submit-btn { background-color: var(--primary); color: #000; font-size: 1rem; font-weight: 600; border: none; border-radius: 5px; padding: 12px; cursor: pointer; width: 100%; margin-top: 1rem; transition: all 0.3s; display: none; }
+        .submit-btn:hover { background-color: var(--primary-hover); box-shadow: 0 0 15px var(--primary); }
+        
+        .user-profile { position: relative; padding: 1.5rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; cursor: pointer; }
+        .dashboard-container.sidebar-visible .user-profile { justify-content: flex-start; }
+        .user-profile .profile-icon { width: 40px; height: 40px; fill: var(--text-secondary); flex-shrink: 0; }
+        .user-profile .user-details { display: flex; flex-direction: column; }
+        .user-profile .user-name { font-weight: 500; color: var(--text-primary); }
+        .user-profile .user-status { font-size: 0.8rem; color: #28a745; }
+
+        .profile-menu { position: absolute; bottom: calc(100% + 10px); left: 1rem; width: calc(100% - 2rem); background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); overflow: hidden; z-index: 10; visibility: hidden; opacity: 0; transform: translateY(10px); transition: all 0.2s ease-in-out; }
+        .user-profile:hover .profile-menu { visibility: visible; opacity: 1; transform: translateY(0); }
+        .profile-menu ul { list-style: none; }
+        .profile-menu ul li a { display: block; padding: 12px 20px; color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .profile-menu ul li a:hover { background-color: var(--primary); color: #000; }
+        
+        .main-content { padding: 2rem; overflow-y: auto; }
+        #dashboard-area { display: flex; flex-direction: column; gap: 2.5rem; }
+        
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2.5rem; }
+        .kpi-item { text-align: left; }
+        .kpi-item.clickable { cursor: pointer; }
+        .kpi-item.clickable:hover .value { color: var(--primary); }
+        .kpi-item .title { font-size: 0.9rem; font-weight: 400; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .kpi-item .value { font-size: 1.6rem; font-weight: 600; color: var(--text-primary); transition: color 0.3s; }
+        
+        .section-title { font-size: 1.5rem; font-weight: 500; margin-bottom: 1.5rem; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .visual-container { margin-bottom: 2rem; }
+        .visual-container h3 { font-size: 1.2rem; font-weight: 500; margin-bottom: 1.5rem; color: var(--text-primary); }
+        table { width: 100%; border-collapse: collapse; background-color: var(--card-bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.9rem; }
+        thead { background-color: #2a3145; }
+        th { color: var(--text-secondary); font-weight: 500; }
+        
+        .spinner { border: 4px solid var(--border-color); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--primary); animation: spin 1s linear infinite; margin: 5rem auto; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background-color: var(--sidebar-bg); padding: 2rem; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; border: 1px solid var(--primary); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { color: var(--primary); }
+        .modal-close-btn { font-size: 2rem; color: var(--text-secondary); cursor: pointer; background: none; border: none; }
+        .modal-body { overflow-y: auto; }
+        .details-toggle { cursor: pointer; font-weight: bold; color: var(--primary); margin-right: 10px; }
+        .child-row { display: none; }
+        .child-row td { padding: 0; background-color: #10141f; }
+        .child-table-container { padding: 1rem 1.5rem 1.5rem 3rem; }
+
+        .sidebar-content::-webkit-scrollbar, .main-content::-webkit-scrollbar, .modal-body::-webkit-scrollbar { display: none; }
+        .sidebar-content, .main-content, .modal-body { scrollbar-width: none; -ms-overflow-style: none; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container sidebar-visible">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <button id="menu-toggle">☰</button>
+                <div>
+                    <h1>Dashboard Fiscal</h1>
+                    <p>Painel de Análise Executiva</p> 
+                </div>
+                <button id="sidebar-close-btn">&times;</button>
+            </div>
+            <div class="sidebar-content">
+                <div class="control-card">
+                    <h2>Análise e Comparativo</h2>
+                    <form id="analysisForm">
+                        <label for="spedFileInput" class="file-label">Selecionar SPED (.txt)</label>
+                        <input type="file" id="spedFileInput" name="sped_file" accept=".txt">
+                        <span id="spedFileName" class="file-name"></span>
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                            <label for="livroFileInput" class="file-label" style="background-color: transparent; border-style: dotted;">Selecionar Livro (Opcional)</label>
+                            <input type="file" id="livroFileInput" name="livro_file" accept=".pdf">
+                            <span id="livroFileName" class="file-name"></span>
+                        </div>
+                        <button type="submit" class="submit-btn">Analisar</button>
+                    </form>
+                </div>
+            </div>
+            <div class="user-profile">
+                <div class="profile-menu">
+                    <ul>
+                        <li><a href="#" id="logoutBtn">Logout</a></li>
+                        <li><a href="#">Profile</a></li>
+                        <li><a href="#">Settings</a></li>
+                    </ul>
+                </div>
+                <svg class="profile-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                <div class="user-details"><span class="user-name">Admin</span><span class="user-status">Online</span></div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div id="dashboard-area"><p style="text-align: center; margin-top: 5rem;">Abra o menu à esquerda para começar uma análise.</p></div>
+        </main>
+    </div>
+    <div id="drilldown-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="modal-title">Detalhes</h2><button id="modal-close" class="modal-close-btn">&times;</button></div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.querySelector('.dashboard-container');
+            const menuToggle = document.getElementById('menu-toggle');
+            const sidebarClose = document.getElementById('sidebar-close-btn');
+            const spedInput = document.getElementById('spedFileInput');
+            const analysisBtn = document.querySelector('#analysisForm .submit-btn');
+
+            menuToggle.addEventListener('click', () => container.classList.add('sidebar-visible'));
+            sidebarClose.addEventListener('click', () => container.classList.remove('sidebar-visible'));
+
+            spedInput.addEventListener('change', (e) => {
+                const fileName = e.target.files[0]?.name || '';
+                document.getElementById('spedFileName').textContent = fileName;
+                analysisBtn.style.display = fileName ? 'block' : 'none';
+            });
+            
+            setupFileNameListener('livroFileInput', 'livroFileName');
+            
+            const modal = document.getElementById('drilldown-modal');
+            document.getElementById('modal-close').addEventListener('click', () => modal.style.display = 'none');
+            modal.addEventListener('click', (e) => { 
+                if (e.target.classList.contains('details-toggle')) { toggleC190Details(e.target); } 
+                else if (e.target === modal) { modal.style.display = 'none'; }
+            });
+
+            document.getElementById('logoutBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = '/';
+            });
+            
+            document.addEventListener('click', function(e) {
+                const kpi = e.target.closest('.kpi-item.clickable');
+                if (kpi) { openDrilldownModal(kpi.dataset.drilldown, kpi.dataset.metricKey); }
+            });
+
+            document.getElementById('analysisForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const livroInput = document.getElementById('livroFileInput');
+                if (spedInput.files.length === 0) { alert('Por favor, selecione um arquivo SPED.'); return; }
+                container.classList.remove('sidebar-visible');
+                if (livroInput.files.length > 0) {
+                    const formData = new FormData(); formData.append('sped_file', spedInput.files[0]); formData.append('livro_file', livroInput.files[0]);
+                    await fetchAPI('/comparar/', formData, 'COMPARE');
+                } else {
+                    const formData = new FormData(); formData.append('file', spedInput.files[0]);
+                    await fetchAPI('/processar_sped/', formData, 'SPED');
+                }
+            });
+        });
+
+        const API_BASE_URL = "http://127.0.0.1:8000";
+        let currentSpedData = null; 
+        const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+        
+        function setupFileNameListener(inputId, spanId) { const element = document.getElementById(inputId); if(element) element.addEventListener('change', (e) => { document.getElementById(spanId).textContent = e.target.files[0]?.name || ''; }); }
+        
+        async function fetchAPI(endpoint, formData, type) { const dashboardArea = document.getElementById('dashboard-area'); dashboardArea.innerHTML = `<div class="spinner"></div>`; try { const response = await fetch(API_BASE_URL + endpoint, { method: 'POST', body: formData }); if (!response.ok) { const errorData = await response.json().catch(() => ({ detail: response.statusText })); throw new Error(`Erro na API: ${errorData.detail || response.statusText}`); } const data = await response.json(); if (type === 'SPED') renderSpedDashboard(data); if (type === 'COMPARE') renderCompareDashboard(data); } catch (error) { dashboardArea.innerHTML = `<p style="color: #ff4d4d; text-align: center; margin-top: 5rem;">${error.message}</p>`; } }
+        
+        function openDrilldownModal(type, metricKey) { /* ... código sem alterações ... */ }
+        function toggleC190Details(toggleButton) { /* ... código sem alterações ... */ }
+        function createKpiItem(title, value, formatter, drilldownKey = null, metricKey = null) { /* ... código sem alterações ... */ }
+        function renderSpedDashboard(data) { /* ... código sem alterações ... */ }
+        function renderCompareDashboard(data) { /* ... código sem alterações ... */ }
+        function renderTable(arr, isParent = false) { /* ... código sem alterações ... */ }
+        function renderSpedChart(resumoC) { /* ... código sem alterações ... */ }
+        function renderChart(comparacaoData) { /* ... código sem alterações ... */ }
+
+        // --- Código completo das funções auxiliares para garantir ---
+        function openDrilldownModal(type, metricKey) { const modal = document.getElementById('drilldown-modal'); if (!currentSpedData || !currentSpedData.resumo_c || !currentSpedData.resumo_c.detalhes) return; const details = currentSpedData.resumo_c.detalhes; const singularType = type.endsWith('s') ? type.slice(0, -1) : type; const filterType = singularType.toUpperCase(); const filteredData = details.filter(d => d.operacao === filterType); const totalValue = filteredData.reduce((sum, item) => sum + (item[metricKey] || 0), 0); const docCount = filteredData.length; let summaryHtml = `<div class="modal-summary"><div class="modal-summary-item"><span class="title">Valor Total</span><span class="value">${currencyFormatter.format(totalValue)}</span></div><div class="modal-summary-item"><span class="title">Documentos</span><span class="value">${docCount}</span></div></div>`; document.getElementById('modal-title').textContent = `Visualização do Cálculo: ${metricKey} de ${type}`; document.getElementById('modal-body').innerHTML = summaryHtml + renderTable(filteredData, false); modal.style.display = 'flex'; }
+        function toggleC190Details(toggleButton) { const docId = toggleButton.dataset.docId; const parentRow = document.getElementById(`doc-row-${docId}`); const existingChildRow = document.getElementById(`child-row-${docId}`); if (existingChildRow) { existingChildRow.remove(); toggleButton.textContent = '[+]'; } else { const docData = currentSpedData.resumo_c.detalhes.find(d => d.doc === docId); if (docData && docData.itens && docData.itens.length > 0) { const childTable = renderTable(docData.itens, true); const newRow = document.createElement('tr'); newRow.id = `child-row-${docId}`; newRow.className = 'child-row'; const newCell = document.createElement('td'); newCell.colSpan = 100; newCell.innerHTML = `<div class="child-table-container">${childTable}</div>`; newRow.appendChild(newCell); parentRow.after(newRow); newRow.style.display = 'table-row'; toggleButton.textContent = '[-]'; } else { toggleButton.textContent = '[-]'; } } }
+        function createKpiItem(title, value, formatter, drilldownKey = null, metricKey = null) { const isClickable = drilldownKey ? 'clickable' : ''; const drilldownAttr = drilldownKey ? `data-drilldown="${drilldownKey}" data-metric-key="${metricKey}"` : ''; const formattedValue = (typeof value === 'number') ? formatter(value) : (value || 'N/A'); return `<div class="kpi-item ${isClickable}" ${drilldownAttr}><div class="title">${title}</div><div class="value">${formattedValue}</div></div>`; }
+        function renderSpedDashboard(data) {
+            if (!data.resumo_c || !data.resumo_c.resumo) { document.getElementById('dashboard-area').innerHTML = `<h2 class="section-title">Análise Concluída</h2><p>Nenhum registro C100 foi encontrado neste arquivo SPED.</p>`; return; }
+            currentSpedData = data; const apuracao = data.resumo_e?.apuracoes[0] || {}; const entradas = data.resumo_c.resumo['Entradas'] || {}; const saidas = data.resumo_c.resumo['Saídas'] || {};
+            let kpiHtml = `<h2 class="section-title">Visão Geral</h2><div class="kpi-grid">`;
+            kpiHtml += createKpiItem("ICMS a Recolher", apuracao.VL_ICMS_RECOLHER, currencyFormatter.format);
+            kpiHtml += createKpiItem("Valor Contábil Saídas", saidas.valor_contabil, currencyFormatter.format, 'saidas', 'valor_contabil');
+            kpiHtml += createKpiItem("Valor Contábil Entradas", entradas.valor_contabil, currencyFormatter.format, 'entradas', 'valor_contabil');
+            kpiHtml += createKpiItem("Valor ICMS Saídas", saidas.valor_icms, currencyFormatter.format, 'saidas', 'valor_icms');
+            kpiHtml += createKpiItem("Valor ICMS Entradas", entradas.valor_icms, currencyFormatter.format, 'entradas', 'valor_icms');
+            kpiHtml += createKpiItem("Documentos de Saída", saidas.qtd_docs, (v) => v, 'saidas', 'doc');
+            kpiHtml += '</div>';
+            let chartHtml = `<div class="visual-container"><h3 class="section-title">Resumo de Operações (Bloco C)</h3><canvas id="spedChart"></canvas></div>`;
+            let tableHtml = `<div class="visual-container"><h3 class="section-title">Movimentações do CIAP (Bloco G)</h3>${renderTable(data.resumo_g)}</div>`;
+            document.getElementById('dashboard-area').innerHTML = kpiHtml + chartHtml + tableHtml; renderSpedChart(data.resumo_c.resumo);
+        }
+        function renderCompareDashboard(data) { const tableContent = renderTable(data.comparacao); const tableHtml = `<div class="visual-container"><h3 class="section-title">Tabela de Divergências</h3>${tableContent}</div>`; const chartHtml = `<div class="visual-container"><h3 class="section-title">Gráfico de Comparação (Saídas)</h3><canvas id="comparisonChart"></canvas></div>`; document.getElementById('dashboard-area').innerHTML = tableHtml + chartHtml; renderChart(data.comparacao); }
+        function renderTable(arr, isParent = false) { if (!arr || arr.length === 0) return '<p style="padding: 1rem 0;">Nenhum dado encontrado.</p>'; let html = '<table><thead><tr>'; if (!isParent) html += '<th></th>'; const headers = Object.keys(arr[0]); headers.forEach(header => { if (header !== 'itens' && header !== 'ind_oper') html += `<th>${header.replace(/_/g, ' ')}</th>`; }); html += '</tr></thead><tbody>'; arr.forEach(row => { const docId = row.doc || Math.random().toString(36).substring(2); html += `<tr id="doc-row-${docId}">`; if (!isParent) { if (row.itens && row.itens.length > 0) { html += `<td><span class="details-toggle" data-doc-id="${docId}">[+]</span></td>`; } else { html += '<td></td>'; } } headers.forEach(header => { if (header !== 'itens' && header !== 'ind_oper') { let value = row[header]; if (typeof value === 'number' && !['doc'].includes(header.toLowerCase())) { value = currencyFormatter.format(value); } html += `<td>${value}</td>`; } }); html += '</tr>'; }); html += '</tbody></table>'; return html; }
+        function renderSpedChart(resumoC) { if(!resumoC) return; const ctx = document.getElementById('spedChart').getContext('2d'); const labels = ['Valor Contábil', 'Base ICMS', 'Valor ICMS', 'Isentas NT', 'Outras']; const entradas = resumoC['Entradas'] || {}; const saidas = resumoC['Saídas'] || {}; const entradasData = labels.map(label => entradas[label.toLowerCase().replace(/ /g, '_')] || 0); const saidasData = labels.map(label => saidas[label.toLowerCase().replace(/ /g, '_')] || 0); new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [ { label: 'Entradas', data: entradasData, backgroundColor: 'rgba(160, 167, 181, 0.6)'}, { label: 'Saídas', data: saidasData, backgroundColor: 'rgba(0, 170, 255, 0.6)'} ] }, options: { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#e6e6e6' } }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${currencyFormatter.format(context.raw)}` } } }, scales: { y: { ticks: { color: '#a0a7b5', callback: (value) => currencyFormatter.format(value) }, grid: { color: '#31394a' } }, x: { ticks: { color: '#a0a7b5' }, grid: { display: false } } } } }); }
+        function renderChart(comparacaoData) { const ctx = document.getElementById('comparisonChart').getContext('2d'); const saidasData = comparacaoData.filter(d => d.tipo === 'Saídas'); const labels = saidasData.map(item => item.metrica); const spedValues = saidasData.map(item => item.sped); const livroValues = saidasData.map(item => item.livro); new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [ { label: 'SPED', data: spedValues, backgroundColor: 'rgba(0, 170, 255, 0.6)' }, { label: 'Livro Fiscal', data: livroValues, backgroundColor: 'rgba(160, 167, 181, 0.6)'} ] }, options: { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#e6e6e6' } }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${currencyFormatter.format(context.raw)}` } } }, scales: { y: { ticks: { color: '#a0a7b5', callback: (value) => currencyFormatter.format(value) }, grid: { color: '#31394a' } }, x: { ticks: { color: '#a0a7b5' }, grid: { display: false } } } } }); }
+    </script>
+</body>
+</html>
