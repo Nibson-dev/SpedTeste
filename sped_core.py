@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from pypdf import PdfReader
 
-# --- CONSTANTES E REGRAS FISCAIS ---
+#  CONSTANTES E REGRAS FISCAIS 
 C100_IND_OPER = 1; C100_NUM_DOC = 8; C100_CHV_NFE = 9; C100_DT_DOC = 10; C100_VL_DOC = 11
 C190_CST_ICMS = 2; C190_CFOP = 3; C190_VL_OPR = 4; C190_VL_BC_ICMS = 5; C190_VL_ICMS = 6
 G125_COD_IND_BEM = 2; G125_DT_MOV = 3; G125_VL_ICMS_OP = 5; G125_VL_ICMS_ST = 6; G125_VL_ICMS_FRT = 7
@@ -98,7 +98,7 @@ def resumo_bloco_c(registros):
 
     return {"resumo": resumo, "detalhes": documentos}
 
-# --- OUTRAS FUNÇÕES (sem alterações) ---
+#  OUTRAS FUNÇÕES 
 def resumo_bloco_g(registros):
     df_g125 = []
     for r in registros:
