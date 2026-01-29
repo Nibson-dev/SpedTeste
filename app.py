@@ -12,7 +12,7 @@ from sped_core import parse_efd, resumo_bloco_c, resumo_bloco_g, resumo_bloco_e,
 
 app = FastAPI(title="API de Processamento SPED")
 
-# --- CONFIGURAÇÃO DE CORS ---
+#  CONFIGURAÇÃO DE CORS 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Simplificado para desenvolvimento
@@ -21,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- ROTAS DE PÁGINA ---
+#  ROTAS DE PÁGINA 
 
 @app.get("/", response_class=FileResponse)
 async def read_login_page():
@@ -29,7 +29,7 @@ async def read_login_page():
 
 @app.post("/login")
 async def handle_login(username: str = Form(), password: str = Form()):
-    # Login provisório: em um app real, isso viria de um banco de dados seguro.
+    # Login provisório: isso virará de um banco de dados seguro.
     if username == "admin" and password == "admin":
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     else:
@@ -40,7 +40,7 @@ async def read_dashboard_page():
     return "dashboard.html"
 
 
-# --- ROTAS DA API (para os dados) ---
+#  ROTAS DA API (para os dados) 
 
 @app.post("/processar_sped/")
 async def processar_sped(file: UploadFile = File(...)):
