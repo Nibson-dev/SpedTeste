@@ -209,16 +209,16 @@
         
         async function fetchAPI(endpoint, formData, type) { const dashboardArea = document.getElementById('dashboard-area'); dashboardArea.innerHTML = `<div class="spinner"></div>`; try { const response = await fetch(API_BASE_URL + endpoint, { method: 'POST', body: formData }); if (!response.ok) { const errorData = await response.json().catch(() => ({ detail: response.statusText })); throw new Error(`Erro na API: ${errorData.detail || response.statusText}`); } const data = await response.json(); if (type === 'SPED') renderSpedDashboard(data); if (type === 'COMPARE') renderCompareDashboard(data); } catch (error) { dashboardArea.innerHTML = `<p style="color: #ff4d4d; text-align: center; margin-top: 5rem;">${error.message}</p>`; } }
         
-        function openDrilldownModal(type, metricKey) { /* ... código sem alterações ... */ }
-        function toggleC190Details(toggleButton) { /* ... código sem alterações ... */ }
-        function createKpiItem(title, value, formatter, drilldownKey = null, metricKey = null) { /* ... código sem alterações ... */ }
-        function renderSpedDashboard(data) { /* ... código sem alterações ... */ }
-        function renderCompareDashboard(data) { /* ... código sem alterações ... */ }
-        function renderTable(arr, isParent = false) { /* ... código sem alterações ... */ }
-        function renderSpedChart(resumoC) { /* ... código sem alterações ... */ }
-        function renderChart(comparacaoData) { /* ... código sem alterações ... */ }
+        function openDrilldownModal(type, metricKey) {  }
+        function toggleC190Details(toggleButton) { }
+        function createKpiItem(title, value, formatter, drilldownKey = null, metricKey = null) {  }
+        function renderSpedDashboard(data) {  }
+        function renderCompareDashboard(data) {  }
+        function renderTable(arr, isParent = false) {  }
+        function renderSpedChart(resumoC) {  }
+        function renderChart(comparacaoData) {  }
 
-        // --- Código completo das funções auxiliares para garantir ---
+        //  Código completo das funções auxiliares para garantir 
         function openDrilldownModal(type, metricKey) { const modal = document.getElementById('drilldown-modal'); if (!currentSpedData || !currentSpedData.resumo_c || !currentSpedData.resumo_c.detalhes) return; const details = currentSpedData.resumo_c.detalhes; const singularType = type.endsWith('s') ? type.slice(0, -1) : type; const filterType = singularType.toUpperCase(); const filteredData = details.filter(d => d.operacao === filterType); const totalValue = filteredData.reduce((sum, item) => sum + (item[metricKey] || 0), 0); const docCount = filteredData.length; let summaryHtml = `<div class="modal-summary"><div class="modal-summary-item"><span class="title">Valor Total</span><span class="value">${currencyFormatter.format(totalValue)}</span></div><div class="modal-summary-item"><span class="title">Documentos</span><span class="value">${docCount}</span></div></div>`; document.getElementById('modal-title').textContent = `Visualização do Cálculo: ${metricKey} de ${type}`; document.getElementById('modal-body').innerHTML = summaryHtml + renderTable(filteredData, false); modal.style.display = 'flex'; }
         function toggleC190Details(toggleButton) { const docId = toggleButton.dataset.docId; const parentRow = document.getElementById(`doc-row-${docId}`); const existingChildRow = document.getElementById(`child-row-${docId}`); if (existingChildRow) { existingChildRow.remove(); toggleButton.textContent = '[+]'; } else { const docData = currentSpedData.resumo_c.detalhes.find(d => d.doc === docId); if (docData && docData.itens && docData.itens.length > 0) { const childTable = renderTable(docData.itens, true); const newRow = document.createElement('tr'); newRow.id = `child-row-${docId}`; newRow.className = 'child-row'; const newCell = document.createElement('td'); newCell.colSpan = 100; newCell.innerHTML = `<div class="child-table-container">${childTable}</div>`; newRow.appendChild(newCell); parentRow.after(newRow); newRow.style.display = 'table-row'; toggleButton.textContent = '[-]'; } else { toggleButton.textContent = '[-]'; } } }
         function createKpiItem(title, value, formatter, drilldownKey = null, metricKey = null) { const isClickable = drilldownKey ? 'clickable' : ''; const drilldownAttr = drilldownKey ? `data-drilldown="${drilldownKey}" data-metric-key="${metricKey}"` : ''; const formattedValue = (typeof value === 'number') ? formatter(value) : (value || 'N/A'); return `<div class="kpi-item ${isClickable}" ${drilldownAttr}><div class="title">${title}</div><div class="value">${formattedValue}</div></div>`; }
